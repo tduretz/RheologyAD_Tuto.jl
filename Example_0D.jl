@@ -31,7 +31,6 @@ function StressVector(σ, τ0, P0, params)
 
     for iter=1:10
         J = Enzyme.jacobian(Enzyme.ForwardWithPrimal, residual_single_phase, x, Const(ε̇II_eff), Const(divV), Const(P0), Const(params))
-        # display(J.derivs[1])
         x .-= J.derivs[1]\J.val
         @show norm(J.val)
         if norm(J.val)<1e-10
@@ -50,7 +49,7 @@ function single_phase_return_mapping()
 
     # Kinematics
     ε̇    = @SVector([0.1, -0.1, 0])
-    divV = -0.05   
+    divV = -0.00   
 
     # Initial conditions
     P    = 0.0
@@ -59,13 +58,13 @@ function single_phase_return_mapping()
     # Parameters
     nt = 44
     params = (
-        G     = 1.0,
-        K     = 3.0,
+        G     = 2.0,
+        K     = 10.0,
         C     = 1.0,
         ϕ     = 35.0,
-        ψ     = 35.0*0,
+        ψ     = 10.0,
         ηvp   = 10.0*0,
-        Δt    = 1.0,
+        Δt    = 1e-1,
     )  
 
     # Probes
@@ -102,7 +101,11 @@ function single_phase_return_mapping()
         probes.λ̇[it] = λ̇ 
     end
 
-    plot(probes.t, probes.τ, xlabel="t", ylabel="τ")
+    p1 = plot(probes.t, probes.τ, xlabel="t", ylabel="τ")
+    p2 = plot(probes.t, probes.P, xlabel="t", ylabel="P")
+    p3 = plot(probes.t, probes.λ̇, xlabel="t", ylabel="λ̇")
+    plot(p1, p2, p3, layout=(3, 1))
+
 end
 
 single_phase_return_mapping()
