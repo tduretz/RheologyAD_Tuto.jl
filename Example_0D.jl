@@ -1,4 +1,4 @@
-using GLMakie, Enzyme, LinearAlgebra
+using Plots, Enzyme, LinearAlgebra, StaticArrays
 
 # Intends to implement constitutive updates as in RheologicalCalculator
 
@@ -11,11 +11,11 @@ function residual_single_phase(x, ε̇II_eff, divV, P0, p)
     χe    = K*Δt
     τII, P, λ̇ = x[1], x[2], x[3]
     f      = τII  - C*cosd(ϕ) - P*sind(ϕ)
-    return [ 
+    return @SVector([ 
         ε̇II_eff  -  (τII)/2/ηe - λ̇*(f>=eps),
         divV     + (P - P0)/χe - λ̇*sind(ψ)*(f>=eps),
         (f - ηvp*λ̇)*(f>=eps) +  λ̇*1*(f<eps)
-    ]
+    ])
 end
 
 function StressVector(σ, τ0, P0, params)
@@ -27,7 +27,7 @@ function StressVector(σ, τ0, P0, params)
     τII     = invII(τ0)
 
     # Rheology update
-    x = [τII, P0, 0.0]
+    x = @MVector([τII, P0, 0.0])
 
     for iter=1:10
         J = Enzyme.jacobian(Enzyme.ForwardWithPrimal, residual_single_phase, x, Const(ε̇II_eff), Const(divV), Const(P0), Const(params))
@@ -42,19 +42,19 @@ function StressVector(σ, τ0, P0, params)
     # Recompute components
     τII, P, λ̇ = x[1], x[2], x[3]
     τ = ε̇_eff .* τII./ε̇II_eff
-    return [τ[1], τ[2], τ[3], P], λ̇
+    return @SVector([τ[1], τ[2], τ[3], P]), λ̇
 end
 
 
 function single_phase_return_mapping()
 
     # Kinematics
-    ε̇    = [0.1, -0.1, 0]
+    ε̇    = @SVector([0.1, -0.1, 0])
     divV = -0.05   
 
     # Initial conditions
     P    = 0.0
-    τ    = [0.0, -0.0, 0]
+    τ    = @SVector([0.0, -0.0, 0])
 
     # Parameters
     nt = 44
@@ -87,7 +87,7 @@ function single_phase_return_mapping()
         
         # Invariants
         ε̇_eff = ε̇ + τ0/(2*params.G*params.Δt)
-        ϵ̇     = [ε̇_eff[1], ε̇_eff[2], ε̇_eff[3], divV]
+        ϵ̇     = @SVector([ε̇_eff[1], ε̇_eff[2], ε̇_eff[3], divV])
         σ, λ̇  = StressVector(ϵ̇, τ0, P0, params)
         τ, P  = σ[1:3], σ[4]
 
@@ -102,24 +102,7 @@ function single_phase_return_mapping()
         probes.λ̇[it] = λ̇ 
     end
 
-    function figure()
-        fig = Figure(fontsize = 20, size = (800, 800) )     
-        ax1 = Axis(fig[1,1], title="Deviatoric stress",  xlabel=L"$t$ [yr]",  ylabel=L"$\tau_{II}$ [MPa]", xlabelsize=20, ylabelsize=20)
-        scatter!(ax1, probes.t, probes.τ)
-        ax2 = Axis(fig[2,1], title="Pressure",  xlabel=L"$t$ [yr]",  ylabel=L"$P$ [MPa]", xlabelsize=20, ylabelsize=20)
-        scatter!(ax2, probes.t, probes.P)
-        ax3 = Axis(fig[3,1], title="Plastic multiplier",  xlabel=L"$P$ [MPa]",  ylabel=L"$\dot{\lambda}$ [1/s]", xlabelsize=20, ylabelsize=20)    
-        scatter!(ax3, probes.t, probes.λ̇)
-        ax4 = Axis(fig[4,1], title="Invariant space",  xlabel=L"$P$ [MPa]",  ylabel=L"$\tau_{II}$ [MPa]", xlabelsize=20, ylabelsize=20)                
-        P1 = LinRange( extrema(probes.P)..., 100)
-        τ1 = LinRange( extrema(probes.τ)..., 100)
-        F  =  τ1' .- params.C*cosd(params.ϕ) .- P1*sind(params.ϕ)
-        contour!(ax4, P1, τ1,  F, levels =[0.])
-        scatter!(ax4, probes.P, probes.τ)
-        display(fig)
-    end
-    with_theme(figure, theme_latexfonts())
-
+    plot(probes.t, probes.τ, xlabel="t", ylabel="τ")
 end
 
 single_phase_return_mapping()
